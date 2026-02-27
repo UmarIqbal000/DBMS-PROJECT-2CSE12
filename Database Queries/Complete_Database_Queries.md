@@ -1,9 +1,4 @@
 # 🏥 Healthcare Analytics - Complete Database Schema
-
-> **Database&nbsp;:** `healthcare_analytics`
-> **Engine&nbsp;&nbsp;:** MySQL
-> **Tables&nbsp;&nbsp;:** 15
-
 ---
 
 ## 📑 Table of Contents
