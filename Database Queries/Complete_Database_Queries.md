@@ -367,13 +367,13 @@ CREATE TABLE billings (
 
 ```sql
 CREATE TABLE insurance (
-    insurance_id     INT AUTO_INCREMENT PRIMARY KEY,         -- Unique insurance record ID
-    patient_id       INT NOT NULL,                           -- FK → patients (policy holder)
-    provider_name    VARCHAR(255),                           -- Insurance company name
-    policy_number    VARCHAR(100),                           -- Policy / member ID
-    coverage_details TEXT,                                   -- Details of what is covered
-    expiry_date      DATE,                                   -- Policy expiry date
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) -- Links to the patient
+    insurance_id     INT AUTO_INCREMENT PRIMARY KEY,       
+    patient_id       INT NOT NULL,                          
+    provider_name    VARCHAR(255),                           
+    policy_number    VARCHAR(100),                        
+    coverage_details TEXT,                                  
+    expiry_date      DATE,                                  
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) 
 );
 ```
 
