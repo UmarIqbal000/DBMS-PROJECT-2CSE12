@@ -1,5 +1,4 @@
 # 🏥 Healthcare Analytics - Complete Database Schema
----
 
 ## 📑 Table of Contents
 
