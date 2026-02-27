@@ -1,8 +1,8 @@
-<br># 🏥 Healthcare Analytics — Complete Database Schema
+# 🏥 Healthcare Analytics - Complete Database Schema
 
 > **Database&nbsp;:** `healthcare_analytics`
 > **Engine&nbsp;&nbsp;:** MySQL
-> **Tables&nbsp;&nbsp;:** 17
+> **Tables&nbsp;&nbsp;:** 15
 
 ---
 
@@ -15,8 +15,8 @@
 | 3 | [User-Related Tables](#step-3--user-related-tables) | `user_profiles`, `patients`, `doctors` |
 | 4 | [Appointments Module](#step-4--appointments-module) | `appointments` |
 | 5 | [Medical Data Tables](#step-5--medical-data-tables) | `patient_vitals`, `medical_records`, `prescriptions` |
-| 6 | [Lab & Diagnostics](#step-6--lab--diagnostics) | `lab_tests`, `lab_results` |
-| 7 | [Billing & Insurance](#step-7--billing--insurance) | `billing`, `insurance` |
+| 6 | [Lab Tests](#step-6--lab-tests) | `lab_tests` |
+| 7 | [Billing & Insurance](#step-7--billing--insurance) | `billings`, `insurance` |
 | 8 | [Analytics & AI Tables](#step-8--analytics--ai-tables) | `health_risk_scores`, `analytics_logs` |
 | 9 | [Audit Logs (Admin)](#step-9--audit-logs-admin) | `audit_logs` |
 | ✅ | [Final Verification](#-final-verification) | — |
@@ -30,9 +30,12 @@ erDiagram
     USERS ||--o| USER_PROFILES : has
     USERS ||--o| PATIENTS : "is a"
     USERS ||--o| DOCTORS : "is a"
+    USERS ||--o{ ANALYTICS_LOGS : logs
     USERS ||--o{ AUDIT_LOGS : generates
 
     HOSPITALS ||--o{ DOCTORS : employs
+    HOSPITALS ||--o{ APPOINTMENTS : hosts
+    HOSPITALS ||--o{ MEDICAL_RECORDS : "recorded at"
 
     PATIENTS ||--o{ APPOINTMENTS : books
     DOCTORS  ||--o{ APPOINTMENTS : attends
@@ -43,16 +46,11 @@ erDiagram
 
     MEDICAL_RECORDS ||--o{ PRESCRIPTIONS : contains
 
-    PATIENTS ||--o{ LAB_TESTS : undergoes
-    DOCTORS  ||--o{ LAB_TESTS : orders
-    LAB_TESTS ||--o{ LAB_RESULTS : produces
-
-    PATIENTS ||--o{ BILLING : receives
-    APPOINTMENTS ||--o{ BILLING : "billed for"
+    PATIENTS ||--o{ BILLINGS : receives
+    APPOINTMENTS ||--o{ BILLINGS : "billed for"
     PATIENTS ||--o{ INSURANCE : "covered by"
 
     PATIENTS ||--o{ HEALTH_RISK_SCORES : evaluated
-    PATIENTS ||--o{ ANALYTICS_LOGS : analyzed
 ```
 
 ---
@@ -82,11 +80,11 @@ USE healthcare_analytics;               -- Switch to it for all subsequent queri
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `user_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
+| `username` | `VARCHAR(100)` | `UNIQUE`, `NOT NULL` |
+| `password` | `VARCHAR(255)` | `NOT NULL` |
 | `email` | `VARCHAR(255)` | `UNIQUE`, `NOT NULL` |
-| `password_hash` | `VARCHAR(255)` | `NOT NULL` |
 | `role` | `ENUM('admin','doctor','patient','analyst')` | `NOT NULL` |
-| `is_active` | `BOOLEAN` | `DEFAULT TRUE` |
-| `created_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `created_on` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
@@ -99,12 +97,12 @@ USE healthcare_analytics;               -- Switch to it for all subsequent queri
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE users (
-    user_id        INT AUTO_INCREMENT PRIMARY KEY,           -- Unique identifier for each user
-    email          VARCHAR(255) UNIQUE NOT NULL,             -- Login email (must be unique)
-    password_hash  VARCHAR(255) NOT NULL,                    -- Bcrypt / hashed password (never plain text)
-    role           ENUM('admin', 'doctor', 'patient', 'analyst') NOT NULL,  -- Access-control role
-    is_active      BOOLEAN DEFAULT TRUE,                     -- Soft-delete flag (FALSE = deactivated)
-    created_at     DATETIME DEFAULT CURRENT_TIMESTAMP        -- Account creation timestamp
+    user_id    INT AUTO_INCREMENT PRIMARY KEY,               -- Unique identifier for each user
+    username   VARCHAR(100) UNIQUE NOT NULL,                 -- Login username (must be unique)
+    password   VARCHAR(255) NOT NULL,                        -- Hashed password (never plain text)
+    email      VARCHAR(255) UNIQUE NOT NULL,                 -- Email address (must be unique)
+    role       ENUM('admin', 'doctor', 'patient', 'analyst') NOT NULL,  -- Access-control role
+    created_on DATETIME DEFAULT CURRENT_TIMESTAMP            -- Account creation timestamp
 );
 ```
 
@@ -116,23 +114,22 @@ CREATE TABLE users (
 |--------|------|-------------|
 | `hospital_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `name` | `VARCHAR(255)` | `NOT NULL` |
-| `city` | `VARCHAR(100)` | — |
-| `hospital_type` | `ENUM('government','private')` | — |
-| `total_beds` | `INT` | — |
+| `location` | `VARCHAR(255)` | — |
+| `contact_info` | `VARCHAR(255)` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: hospitals
 -- Purpose : Master list of hospitals / healthcare facilities.
---           Doctors are linked to a hospital via foreign key.
+--           Doctors, appointments, and medical records are
+--           linked to a hospital via foreign key.
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE hospitals (
-    hospital_id   INT AUTO_INCREMENT PRIMARY KEY,            -- Unique hospital identifier
-    name          VARCHAR(255) NOT NULL,                     -- Official hospital name
-    city          VARCHAR(100),                              -- City where the hospital is located
-    hospital_type ENUM('government', 'private'),             -- Ownership type
-    total_beds    INT                                        -- Total bed capacity
+    hospital_id  INT AUTO_INCREMENT PRIMARY KEY,             -- Unique hospital identifier
+    name         VARCHAR(255) NOT NULL,                      -- Official hospital name
+    location     VARCHAR(255),                               -- Address / location of the hospital
+    contact_info VARCHAR(255)                                -- Phone, email, or other contact details
 );
 ```
 
@@ -148,7 +145,8 @@ CREATE TABLE hospitals (
 | `user_id` | `INT` | `NOT NULL`, **FK → `users`** |
 | `first_name` | `VARCHAR(100)` | — |
 | `last_name` | `VARCHAR(100)` | — |
-| `phone` | `VARCHAR(20)` | — |
+| `date_of_birth` | `DATE` | — |
+| `contact_number` | `VARCHAR(20)` | — |
 | `address` | `TEXT` | — |
 
 ```sql
@@ -160,12 +158,13 @@ CREATE TABLE hospitals (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE user_profiles (
-    profile_id  INT AUTO_INCREMENT PRIMARY KEY,              -- Profile record ID
-    user_id     INT NOT NULL,                                -- FK → users (one-to-one)
-    first_name  VARCHAR(100),                                -- User's first name
-    last_name   VARCHAR(100),                                -- User's last name
-    phone       VARCHAR(20),                                 -- Contact phone number
-    address     TEXT,                                        -- Full mailing / residential address
+    profile_id     INT AUTO_INCREMENT PRIMARY KEY,           -- Profile record ID
+    user_id        INT NOT NULL,                             -- FK → users (one-to-one)
+    first_name     VARCHAR(100),                             -- User's first name
+    last_name      VARCHAR(100),                             -- User's last name
+    date_of_birth  DATE,                                     -- User's date of birth
+    contact_number VARCHAR(20),                              -- Contact phone number
+    address        TEXT,                                     -- Full mailing / residential address
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE                                    -- Auto-remove profile when user is deleted
 );
@@ -179,27 +178,25 @@ CREATE TABLE user_profiles (
 |--------|------|-------------|
 | `patient_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `user_id` | `INT` | `NOT NULL`, **FK → `users`** |
+| `gender` | `VARCHAR(10)` | — |
 | `blood_group` | `VARCHAR(10)` | — |
-| `allergies` | `TEXT` | — |
-| `chronic_conditions` | `TEXT` | — |
-| `created_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `emergency_contact` | `VARCHAR(20)` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: patients
 -- Purpose : Medical identity of a user who is a patient.
---           Holds health-specific data (blood group,
---           allergies, chronic conditions).
+--           Holds health-specific data (gender, blood group,
+--           emergency contact).
 -- On Delete: CASCADE — removing the user removes patient data.
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE patients (
-    patient_id         INT AUTO_INCREMENT PRIMARY KEY,       -- Unique patient identifier
-    user_id            INT NOT NULL,                         -- FK → users (links patient to login account)
-    blood_group        VARCHAR(10),                          -- e.g. A+, B-, O+, AB+
-    allergies          TEXT,                                 -- Known drug / food allergies
-    chronic_conditions TEXT,                                 -- Long-term conditions (diabetes, asthma, etc.)
-    created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,   -- When the patient record was created
+    patient_id        INT AUTO_INCREMENT PRIMARY KEY,        -- Unique patient identifier
+    user_id           INT NOT NULL,                          -- FK → users (links patient to login account)
+    gender            VARCHAR(10),                           -- e.g. Male, Female, Other
+    blood_group       VARCHAR(10),                           -- e.g. A+, B-, O+, AB+
+    emergency_contact VARCHAR(20),                           -- Emergency contact phone number
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE                                    -- Cascade delete with user account
 );
@@ -213,27 +210,25 @@ CREATE TABLE patients (
 |--------|------|-------------|
 | `doctor_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `user_id` | `INT` | `NOT NULL`, **FK → `users`** |
+| `hospital_id` | `INT` | **FK → `hospitals`** |
 | `specialization` | `VARCHAR(100)` | — |
 | `license_number` | `VARCHAR(50)` | `UNIQUE` |
-| `experience_years` | `INT` | — |
-| `hospital_id` | `INT` | **FK → `hospitals`** |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: doctors
 -- Purpose : Professional details of users who are doctors.
 --           Each doctor is optionally linked to a hospital.
--- FKs     : user_id  → users      (CASCADE on delete)
+-- FKs     : user_id     → users      (CASCADE on delete)
 --           hospital_id → hospitals
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE doctors (
-    doctor_id        INT AUTO_INCREMENT PRIMARY KEY,         -- Unique doctor identifier
-    user_id          INT NOT NULL,                           -- FK → users (links doctor to login account)
-    specialization   VARCHAR(100),                           -- e.g. Cardiology, Neurology
-    license_number   VARCHAR(50) UNIQUE,                     -- Medical license (must be unique)
-    experience_years INT,                                    -- Years of professional experience
-    hospital_id      INT,                                    -- FK → hospitals (where the doctor practices)
+    doctor_id      INT AUTO_INCREMENT PRIMARY KEY,           -- Unique doctor identifier
+    user_id        INT NOT NULL,                             -- FK → users (links doctor to login account)
+    hospital_id    INT,                                      -- FK → hospitals (where the doctor practices)
+    specialization VARCHAR(100),                             -- e.g. Cardiology, Neurology
+    license_number VARCHAR(50) UNIQUE,                       -- Medical license (must be unique)
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,                                   -- Remove doctor record if user is deleted
     FOREIGN KEY (hospital_id) REFERENCES hospitals(hospital_id)  -- Links to the hospital master table
@@ -251,28 +246,32 @@ CREATE TABLE doctors (
 | `appointment_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
 | `doctor_id` | `INT` | `NOT NULL`, **FK → `doctors`** |
+| `hospital_id` | `INT` | **FK → `hospitals`** |
 | `appointment_date` | `DATE` | — |
-| `appointment_time` | `TIME` | — |
 | `status` | `ENUM('scheduled','completed','cancelled')` | — |
+| `reason` | `TEXT` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: appointments
 -- Purpose : Tracks scheduled, completed, and cancelled
---           visits between a patient and a doctor.
--- FKs     : patient_id → patients
---           doctor_id  → doctors
+--           visits between a patient and a doctor at a hospital.
+-- FKs     : patient_id  → patients
+--           doctor_id   → doctors
+--           hospital_id → hospitals
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE appointments (
     appointment_id   INT AUTO_INCREMENT PRIMARY KEY,         -- Unique appointment ID
     patient_id       INT NOT NULL,                           -- FK → patients (who booked the visit)
     doctor_id        INT NOT NULL,                           -- FK → doctors  (assigned physician)
+    hospital_id      INT,                                    -- FK → hospitals (where the visit takes place)
     appointment_date DATE,                                   -- Date of the appointment
-    appointment_time TIME,                                   -- Scheduled time slot
     status           ENUM('scheduled', 'completed', 'cancelled'),  -- Current appointment status
+    reason           TEXT,                                   -- Reason for the appointment
     FOREIGN KEY (patient_id) REFERENCES patients(patient_id),      -- Links to patient record
-    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)          -- Links to doctor record
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),         -- Links to doctor record
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(hospital_id)    -- Links to hospital
 );
 ```
 
@@ -286,10 +285,12 @@ CREATE TABLE appointments (
 |--------|------|-------------|
 | `vital_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
-| `heart_rate` | `INT` | — |
-| `blood_pressure` | `VARCHAR(20)` | — |
-| `temperature` | `FLOAT` | — |
 | `recorded_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `heart_rate` | `INT` | — |
+| `bp_systolic` | `INT` | — |
+| `bp_diastolic` | `INT` | — |
+| `temperature` | `FLOAT` | — |
+| `respiratory_rate` | `INT` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
@@ -300,12 +301,14 @@ CREATE TABLE appointments (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE patient_vitals (
-    vital_id        INT AUTO_INCREMENT PRIMARY KEY,          -- Unique reading ID
-    patient_id      INT NOT NULL,                            -- FK → patients (whose vitals these are)
-    heart_rate      INT,                                     -- Beats per minute (BPM)
-    blood_pressure  VARCHAR(20),                             -- Format: "120/80" (systolic/diastolic)
-    temperature     FLOAT,                                   -- Body temperature in °F or °C
-    recorded_at     DATETIME DEFAULT CURRENT_TIMESTAMP,      -- When the reading was taken
+    vital_id         INT AUTO_INCREMENT PRIMARY KEY,         -- Unique reading ID
+    patient_id       INT NOT NULL,                           -- FK → patients (whose vitals these are)
+    recorded_at      DATETIME DEFAULT CURRENT_TIMESTAMP,     -- When the reading was taken
+    heart_rate       INT,                                    -- Beats per minute (BPM)
+    bp_systolic      INT,                                    -- Systolic blood pressure (mmHg)
+    bp_diastolic     INT,                                    -- Diastolic blood pressure (mmHg)
+    temperature      FLOAT,                                  -- Body temperature in °F or °C
+    respiratory_rate INT,                                    -- Breaths per minute
     FOREIGN KEY (patient_id) REFERENCES patients(patient_id) -- Links to the patient
 );
 ```
@@ -319,9 +322,10 @@ CREATE TABLE patient_vitals (
 | `record_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
 | `doctor_id` | `INT` | `NOT NULL`, **FK → `doctors`** |
+| `hospital_id` | `INT` | **FK → `hospitals`** |
+| `visit_date` | `DATE` | — |
 | `diagnosis` | `TEXT` | — |
 | `treatment_plan` | `TEXT` | — |
-| `record_date` | `DATE` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
@@ -329,19 +333,22 @@ CREATE TABLE patient_vitals (
 -- Purpose : Core clinical records — each row represents one
 --           visit / consultation where a doctor diagnosed
 --           a patient and outlined a treatment plan.
--- FKs     : patient_id → patients
---           doctor_id  → doctors
+-- FKs     : patient_id  → patients
+--           doctor_id   → doctors
+--           hospital_id → hospitals
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE medical_records (
-    record_id       INT AUTO_INCREMENT PRIMARY KEY,          -- Unique record ID
-    patient_id      INT NOT NULL,                            -- FK → patients (who was examined)
-    doctor_id       INT NOT NULL,                            -- FK → doctors  (who examined)
-    diagnosis       TEXT,                                    -- Doctor's diagnosis summary
-    treatment_plan  TEXT,                                    -- Prescribed treatment & follow-up plan
-    record_date     DATE,                                    -- Date of the consultation
+    record_id      INT AUTO_INCREMENT PRIMARY KEY,           -- Unique record ID
+    patient_id     INT NOT NULL,                             -- FK → patients (who was examined)
+    doctor_id      INT NOT NULL,                             -- FK → doctors  (who examined)
+    hospital_id    INT,                                      -- FK → hospitals (where the visit took place)
+    visit_date     DATE,                                     -- Date of the consultation / visit
+    diagnosis      TEXT,                                     -- Doctor's diagnosis summary
+    treatment_plan TEXT,                                     -- Prescribed treatment & follow-up plan
     FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
-    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)
+    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id),
+    FOREIGN KEY (hospital_id) REFERENCES hospitals(hospital_id)
 );
 ```
 
@@ -353,9 +360,11 @@ CREATE TABLE medical_records (
 |--------|------|-------------|
 | `prescription_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `record_id` | `INT` | `NOT NULL`, **FK → `medical_records`** |
-| `medicine_name` | `VARCHAR(255)` | — |
+| `medication_name` | `VARCHAR(255)` | — |
 | `dosage` | `VARCHAR(100)` | — |
-| `duration` | `VARCHAR(100)` | — |
+| `frequency` | `VARCHAR(100)` | — |
+| `start_date` | `DATE` | — |
+| `end_date` | `DATE` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
@@ -369,9 +378,11 @@ CREATE TABLE medical_records (
 CREATE TABLE prescriptions (
     prescription_id INT AUTO_INCREMENT PRIMARY KEY,          -- Unique prescription ID
     record_id       INT NOT NULL,                            -- FK → medical_records (parent consultation)
-    medicine_name   VARCHAR(255),                            -- Name of the prescribed medicine
-    dosage          VARCHAR(100),                            -- e.g. "500mg twice daily"
-    duration        VARCHAR(100),                            -- e.g. "7 days", "2 weeks"
+    medication_name VARCHAR(255),                            -- Name of the prescribed medication
+    dosage          VARCHAR(100),                            -- e.g. "500mg"
+    frequency       VARCHAR(100),                            -- e.g. "twice daily", "every 8 hours"
+    start_date      DATE,                                    -- When to start taking the medication
+    end_date        DATE,                                    -- When to stop taking the medication
     FOREIGN KEY (record_id) REFERENCES medical_records(record_id)
         ON DELETE CASCADE                                    -- Auto-remove if medical record is deleted
 );
@@ -379,69 +390,33 @@ CREATE TABLE prescriptions (
 
 ---
 
-## Step 6 — Lab & Diagnostics
+## Step 6 — Lab Tests
 
-### 6.1 `lab_tests`
+### `lab_tests`
 
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `test_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
-| `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
-| `doctor_id` | `INT` | `NOT NULL`, **FK → `doctors`** |
-| `test_name` | `VARCHAR(255)` | — |
-| `test_date` | `DATE` | — |
-| `status` | `ENUM('pending','completed')` | — |
+| `test_name` | `VARCHAR(255)` | `NOT NULL` |
+| `description` | `TEXT` | — |
+| `std_range_min` | `FLOAT` | — |
+| `std_range_max` | `FLOAT` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: lab_tests
--- Purpose : Tracks laboratory tests ordered by a doctor
---           for a patient (e.g. CBC, lipid panel, X-ray).
--- FKs     : patient_id → patients
---           doctor_id  → doctors
+-- Purpose : Reference / catalog table of available laboratory
+--           tests (e.g. CBC, Lipid Panel, Blood Sugar).
+--           Stores standard reference ranges for each test.
+-- Note    : This is a standalone lookup table with no FKs.
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE lab_tests (
-    test_id     INT AUTO_INCREMENT PRIMARY KEY,              -- Unique test ID
-    patient_id  INT NOT NULL,                                -- FK → patients (who the test is for)
-    doctor_id   INT NOT NULL,                                -- FK → doctors  (who ordered the test)
-    test_name   VARCHAR(255),                                -- e.g. "Complete Blood Count (CBC)"
-    test_date   DATE,                                        -- Date the test was / will be conducted
-    status      ENUM('pending', 'completed'),                -- Whether results are available yet
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
-    FOREIGN KEY (doctor_id) REFERENCES doctors(doctor_id)
-);
-```
-
----
-
-### 6.2 `lab_results`
-
-| Column | Type | Constraints |
-|--------|------|-------------|
-| `result_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
-| `test_id` | `INT` | `NOT NULL`, **FK → `lab_tests`** |
-| `parameter_name` | `VARCHAR(255)` | — |
-| `result_value` | `VARCHAR(100)` | — |
-| `normal_range` | `VARCHAR(100)` | — |
-
-```sql
--- ────────────────────────────────────────────────────────────
--- TABLE: lab_results
--- Purpose : Individual result parameters for a completed
---           lab test (a single test may have many parameters).
--- Example : Test "CBC" → parameters: Hemoglobin, WBC, RBC…
--- On Delete: CASCADE — results removed when parent test is.
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE lab_results (
-    result_id       INT AUTO_INCREMENT PRIMARY KEY,          -- Unique result row ID
-    test_id         INT NOT NULL,                            -- FK → lab_tests (parent test)
-    parameter_name  VARCHAR(255),                            -- e.g. "Hemoglobin", "WBC Count"
-    result_value    VARCHAR(100),                            -- Measured value (e.g. "14.5 g/dL")
-    normal_range    VARCHAR(100),                            -- Reference range (e.g. "13.0–17.5 g/dL")
-    FOREIGN KEY (test_id) REFERENCES lab_tests(test_id)
-        ON DELETE CASCADE                                    -- Cascade delete with parent test
+    test_id       INT AUTO_INCREMENT PRIMARY KEY,            -- Unique test ID
+    test_name     VARCHAR(255) NOT NULL,                     -- e.g. "Complete Blood Count (CBC)"
+    description   TEXT,                                      -- Detailed description of the test
+    std_range_min FLOAT,                                     -- Standard minimum reference value
+    std_range_max FLOAT                                      -- Standard maximum reference value
 );
 ```
 
@@ -449,35 +424,35 @@ CREATE TABLE lab_results (
 
 ## Step 7 — Billing & Insurance
 
-### 7.1 `billing`
+### 7.1 `billings`
 
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `bill_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
-| `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
 | `appointment_id` | `INT` | `NOT NULL`, **FK → `appointments`** |
-| `total_amount` | `FLOAT` | — |
+| `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
+| `amount` | `FLOAT` | — |
 | `payment_status` | `ENUM('paid','unpaid','pending')` | — |
-| `billing_date` | `DATE` | — |
+| `generated_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
--- TABLE: billing
+-- TABLE: billings
 -- Purpose : Financial record for each appointment.
 --           Tracks how much is owed and payment status.
--- FKs     : patient_id     → patients
---           appointment_id → appointments
+-- FKs     : appointment_id → appointments
+--           patient_id     → patients
 -- ────────────────────────────────────────────────────────────
 
-CREATE TABLE billing (
-    bill_id         INT AUTO_INCREMENT PRIMARY KEY,          -- Unique bill ID
-    patient_id      INT NOT NULL,                            -- FK → patients (who is being billed)
-    appointment_id  INT NOT NULL,                            -- FK → appointments (what visit this is for)
-    total_amount    FLOAT,                                   -- Total bill amount (in local currency)
-    payment_status  ENUM('paid', 'unpaid', 'pending'),       -- Current payment state
-    billing_date    DATE,                                    -- Date the bill was generated
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
-    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id)
+CREATE TABLE billings (
+    bill_id        INT AUTO_INCREMENT PRIMARY KEY,           -- Unique bill ID
+    appointment_id INT NOT NULL,                             -- FK → appointments (what visit this is for)
+    patient_id     INT NOT NULL,                             -- FK → patients (who is being billed)
+    amount         FLOAT,                                    -- Total bill amount (in local currency)
+    payment_status ENUM('paid', 'unpaid', 'pending'),        -- Current payment state
+    generated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,       -- When the bill was generated
+    FOREIGN KEY (appointment_id) REFERENCES appointments(appointment_id),
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
 );
 ```
 
@@ -491,22 +466,24 @@ CREATE TABLE billing (
 | `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
 | `provider_name` | `VARCHAR(255)` | — |
 | `policy_number` | `VARCHAR(100)` | — |
-| `coverage_percentage` | `FLOAT` | — |
+| `coverage_details` | `TEXT` | — |
+| `expiry_date` | `DATE` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: insurance
 -- Purpose : Insurance policy details linked to a patient.
---           Used to calculate how much of a bill is covered.
+--           Used to determine coverage for billing.
 -- FK      : patient_id → patients
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE insurance (
-    insurance_id        INT AUTO_INCREMENT PRIMARY KEY,      -- Unique insurance record ID
-    patient_id          INT NOT NULL,                        -- FK → patients (policy holder)
-    provider_name       VARCHAR(255),                        -- Insurance company name
-    policy_number       VARCHAR(100),                        -- Policy / member ID
-    coverage_percentage FLOAT,                               -- % of bill covered (e.g. 80.0 = 80%)
+    insurance_id     INT AUTO_INCREMENT PRIMARY KEY,         -- Unique insurance record ID
+    patient_id       INT NOT NULL,                           -- FK → patients (policy holder)
+    provider_name    VARCHAR(255),                           -- Insurance company name
+    policy_number    VARCHAR(100),                           -- Policy / member ID
+    coverage_details TEXT,                                   -- Details of what is covered
+    expiry_date      DATE,                                   -- Policy expiry date
     FOREIGN KEY (patient_id) REFERENCES patients(patient_id) -- Links to the patient
 );
 ```
@@ -519,11 +496,12 @@ CREATE TABLE insurance (
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| `risk_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
+| `score_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
-| `risk_type` | `VARCHAR(100)` | — |
-| `risk_score` | `FLOAT` | — |
-| `generated_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `calculated_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `risk_model` | `VARCHAR(255)` | — |
+| `score_value` | `FLOAT` | — |
+| `risk_level` | `VARCHAR(50)` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
@@ -535,11 +513,12 @@ CREATE TABLE insurance (
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE health_risk_scores (
-    risk_id       INT AUTO_INCREMENT PRIMARY KEY,            -- Unique risk record ID
+    score_id      INT AUTO_INCREMENT PRIMARY KEY,            -- Unique risk score record ID
     patient_id    INT NOT NULL,                              -- FK → patients (who was evaluated)
-    risk_type     VARCHAR(100),                              -- e.g. "Heart Disease", "Diabetes"
-    risk_score    FLOAT,                                     -- Probability score (0.0 – 1.0)
-    generated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,        -- When the model generated this score
+    calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP,        -- When the score was calculated
+    risk_model    VARCHAR(255),                              -- e.g. "XGBoost v2.1", "Logistic Regression"
+    score_value   FLOAT,                                     -- Computed risk score (e.g. 0.0 – 1.0)
+    risk_level    VARCHAR(50),                               -- e.g. "Low", "Medium", "High", "Critical"
     FOREIGN KEY (patient_id) REFERENCES patients(patient_id) -- Links to the patient
 );
 ```
@@ -551,27 +530,29 @@ CREATE TABLE health_risk_scores (
 | Column | Type | Constraints |
 |--------|------|-------------|
 | `log_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
-| `patient_id` | `INT` | `NOT NULL`, **FK → `patients`** |
-| `analysis_type` | `VARCHAR(255)` | — |
-| `model_used` | `VARCHAR(255)` | — |
-| `created_at` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `user_id` | `INT` | `NOT NULL`, **FK → `users`** |
+| `action_type` | `VARCHAR(255)` | — |
+| `entity_affected` | `VARCHAR(255)` | — |
+| `timestamp` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
+| `details` | `TEXT` | — |
 
 ```sql
 -- ────────────────────────────────────────────────────────────
 -- TABLE: analytics_logs
--- Purpose : Audit trail for every AI/ML analysis run on a
---           patient's data — useful for reproducibility,
---           debugging models, and compliance.
--- FK      : patient_id → patients
+-- Purpose : Tracks analytics actions performed by users —
+--           useful for reproducibility, debugging models,
+--           and compliance.
+-- FK      : user_id → users
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE analytics_logs (
     log_id          INT AUTO_INCREMENT PRIMARY KEY,          -- Unique log entry ID
-    patient_id      INT NOT NULL,                            -- FK → patients (whose data was analyzed)
-    analysis_type   VARCHAR(255),                            -- e.g. "Risk Prediction", "Readmission Forecast"
-    model_used      VARCHAR(255),                            -- e.g. "XGBoost v2.1", "Logistic Regression"
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,      -- Timestamp of the analysis run
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id) -- Links to the patient
+    user_id         INT NOT NULL,                            -- FK → users (who performed the action)
+    action_type     VARCHAR(255),                            -- e.g. "Risk Prediction", "Report Generation"
+    entity_affected VARCHAR(255),                            -- e.g. "patients", "medical_records"
+    timestamp       DATETIME DEFAULT CURRENT_TIMESTAMP,      -- When the action was performed
+    details         TEXT,                                    -- Additional details about the action
+    FOREIGN KEY (user_id) REFERENCES users(user_id)          -- Links to the user
 );
 ```
 
@@ -583,10 +564,13 @@ CREATE TABLE analytics_logs (
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| `log_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
+| `audit_id` | `INT` | `AUTO_INCREMENT`, **PRIMARY KEY** |
 | `user_id` | `INT` | `NOT NULL`, **FK → `users`** |
-| `action` | `VARCHAR(255)` | — |
 | `table_name` | `VARCHAR(100)` | — |
+| `record_id` | `INT` | — |
+| `action` | `VARCHAR(255)` | — |
+| `old_value` | `TEXT` | — |
+| `new_value` | `TEXT` | — |
 | `timestamp` | `DATETIME` | `DEFAULT CURRENT_TIMESTAMP` |
 
 ```sql
@@ -595,14 +579,18 @@ CREATE TABLE analytics_logs (
 -- Purpose : Security & compliance log — records every
 --           significant action (INSERT, UPDATE, DELETE)
 --           performed by any user in the system.
+--           Stores old and new values for change tracking.
 -- FK      : user_id → users
 -- ────────────────────────────────────────────────────────────
 
 CREATE TABLE audit_logs (
-    log_id      INT AUTO_INCREMENT PRIMARY KEY,              -- Unique log entry ID
+    audit_id    INT AUTO_INCREMENT PRIMARY KEY,              -- Unique audit log entry ID
     user_id     INT NOT NULL,                                -- FK → users (who performed the action)
-    action      VARCHAR(255),                                -- e.g. "INSERT", "UPDATE", "DELETE"
     table_name  VARCHAR(100),                                -- Which table was affected
+    record_id   INT,                                         -- ID of the affected record
+    action      VARCHAR(255),                                -- e.g. "INSERT", "UPDATE", "DELETE"
+    old_value   TEXT,                                        -- Previous value (for UPDATE / DELETE)
+    new_value   TEXT,                                        -- New value (for INSERT / UPDATE)
     timestamp   DATETIME DEFAULT CURRENT_TIMESTAMP,          -- When the action occurred
     FOREIGN KEY (user_id) REFERENCES users(user_id)          -- Links to the acting user
 );
@@ -612,34 +600,32 @@ CREATE TABLE audit_logs (
 
 ## ✅ Final Verification
 
-Run the following query to confirm all **17 tables** were created successfully:
+Run the following query to confirm all **15 tables** were created successfully:
 
 ```sql
--- Quick verification query — should return exactly 17 table names
+-- Quick verification query — should return exactly 15 table names
 SHOW TABLES;
 ```
 
-**Expected output — 17 tables:**
+**Expected output — 15 tables:**
 
 | # | Table Name |
 |---|------------|
 | 1 | `analytics_logs` |
 | 2 | `appointments` |
 | 3 | `audit_logs` |
-| 4 | `billing` |
+| 4 | `billings` |
 | 5 | `doctors` |
 | 6 | `health_risk_scores` |
 | 7 | `hospitals` |
 | 8 | `insurance` |
-| 9 | `lab_results` |
-| 10 | `lab_tests` |
-| 11 | `medical_records` |
-| 12 | `patient_vitals` |
-| 13 | `patients` |
-| 14 | `prescriptions` |
-| 15 | `user_profiles` |
-| 16 | `users` |
-| 17 | `audit_logs` |
+| 9 | `lab_tests` |
+| 10 | `medical_records` |
+| 11 | `patient_vitals` |
+| 12 | `patients` |
+| 13 | `prescriptions` |
+| 14 | `user_profiles` |
+| 15 | `users` |
 
 ---
 
