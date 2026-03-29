@@ -1,6 +1,6 @@
-# 🏥 Healthcare Analytics - Complete Database Schema
+# Healthcare Analytics - Complete Database Schema
 
-## 📑 Table of Contents
+## Table of Contents
 
 | # | Section | Tables |
 |---|---------|--------|
@@ -17,7 +17,7 @@
 
 ---
 
-## 🗃️ Entity-Relationship Overview
+## Entity-Relationship Overview
 
 ```mermaid
 erDiagram
@@ -461,7 +461,7 @@ CREATE TABLE audit_logs (
 
 ---
 
-## ✅ Final Verification
+## Final Verification
 
 Run the following query to confirm all **15 tables** were created successfully:
 

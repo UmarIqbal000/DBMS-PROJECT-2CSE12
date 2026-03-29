@@ -242,33 +242,70 @@ Primary keys uniquely identify each entity, and foreign keys maintain referentia
 ## Project Structure
 
 ```
-Healthcare Analytics/
-├──|
- README.md
+DBMS Project/
+│
+├── README.md                                              ← Project documentation
 │
 ├── Database Queries/
-│   ├── Complete_Database_Queries.md
-│   └── creating_and_settingup_database.sql
+│   │
+│   ├── Phase 1/
+│   │   └── Phase_01.pdf                                   ← Phase 1 documentation
+│   │
+│   ├── Phase 2/
+│   │   ├── Complete_Database_Queries.md                   ← Full SQL schema with detailed comments
+│   │   ├── creating_and_settingup_database.sql            ← Complete SQL setup script (15 tables)
+│   │   └── Phase_02.pdf                                   ← Phase 2 documentation
+│   │
+│   ├── Phase 3/
+│   │   ├── Complete_Database_Insert_Records.md            ← Insert queries documentation
+│   │   ├── insertion_of_records.sql                       ← Sample data insertion script
+│   │   └── Phase_03.pdf                                   ← Phase 3 documentation
+│   │
+│   └── Verification/
+│       ├── Verification.md                                ← Verification queries documentation
+│       ├── verification.sql                               ← Table verification queries
+│       └── DBMS Verification.pdf                          ← Verification documentation
 │
 └── Project Resources/
-    └── ER Diagram.png
+    └── ER Diagram.png                                     ← Entity-Relationship diagram
 ```
 
 ---
 
-## Project Structure
+## Setup Instructions
 
+### Step 1: Create the Database
+Run the schema creation script to set up the database and all 15 tables:
+```sql
+-- Execute the complete setup script
+source Database Queries/Phase 2/creating_and_settingup_database.sql;
 ```
-DBMS Project/
-|
-├── README.md                                           ← Project documentation
-│
-├── Database Queries/
-│   ├── Complete_Database_Queries.md                    ← Full SQL schema with detailed comments
-│   └── creating_and_settingup_database.sql            ← Complete SQL setup script
-│
-└── Project Resources/
-    └── ER Diagram.png                                 ← Entity-Relationship diagram
+
+### Step 2: Insert Sample Data
+Populate the tables with sample records:
+```sql
+-- Execute the insertion script
+source Database Queries/Phase 3/insertion_of_records.sql;
 ```
+
+### Step 3: Verify the Setup
+Run verification queries to confirm data was loaded correctly:
+```sql
+-- Execute verification queries
+source Database Queries/Verification/verification.sql;
+```
+
+---
+
+## Database Statistics
+
+| Category | Count |
+|----------|-------|
+| Total Tables | 15 |
+| Sample Users | 10 |
+| Sample Hospitals | 5 |
+| Sample Patients | 5 |
+| Sample Doctors | 4 |
+| Sample Appointments | 10 |
 
 ---
